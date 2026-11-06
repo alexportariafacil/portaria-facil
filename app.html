@@ -3,32 +3,32 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Portaria Fácil</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 * { box-sizing: border-box; }
 body {
   margin: 0;
   font-family: Arial, sans-serif;
-  background: #f3f4f6;
+  background: #f2f2f2;
   color: #222;
 }
 header {
   background: #111;
   color: white;
-  padding: 24px;
+  padding: 25px 15px;
   text-align: center;
 }
 main {
-  max-width: 650px;
+  max-width: 480px;
   margin: 30px auto;
-  padding: 20px;
+  padding: 15px;
 }
 .card {
   background: white;
   padding: 24px;
   border-radius: 12px;
-  margin-bottom: 18px;
   box-shadow: 0 2px 8px #0001;
 }
 input, button {
@@ -43,8 +43,13 @@ button {
   background: #111;
   color: white;
   border: 0;
+  cursor: pointer;
 }
-.azul { color: #1769aa; }
+#mensagem {
+  margin-top: 15px;
+  overflow-wrap: anywhere;
+}
+.secundario { background: #555; }
 footer {
   text-align: center;
   padding: 20px;
@@ -57,25 +62,120 @@ footer {
   <h1>Portaria Fácil</h1>
   <p>Gestão inteligente de encomendas</p>
 </header>
+
 <main>
-  <section class="card">
+  <section class="card" id="login">
     <h2>Bem-vindo!</h2>
-    <p>Entre na plataforma para acessar seu condomínio.</p>
-    <input type="email" placeholder="Seu e-mail">
-    <input type="password" placeholder="Sua senha">
-    <button>Entrar</button>
-    <p class="azul">Acesso para administrador, porteiro e morador.</p>
+    <p>Entre com seu e-mail e sua senha cadastrados.</p>
+    <form id="formLogin">
+      <input id="email" type="email"
+        placeholder="Seu e-mail" required>
+      <input id="senha" type="password"
+        placeholder="Sua senha" required>
+      <button type="submit">Entrar</button>
+    </form>
+    <p id="mensagem" role="status"></p>
   </section>
-  <section class="card">
-    <h2>Painel de controle</h2>
-    <p>Gerencie condomínios, moradores e encomendas.</p>
-    <p>📦 Encomendas recebidas</p>
-    <p>🏢 Condomínios cadastrados</p>
-    <p>👥 Usuários cadastrados</p>
+
+  <section class="card" id="painel" hidden>
+    <h2>Bem-vindo ao Portaria Fácil!</h2>
+    <p id="usuario"></p>
+    <p id="perfil"></p>
+    <p id="condominio"></p>
+    <button class="secundario" id="sair">Sair</button>
   </section>
 </main>
+
 <footer>
   Portaria Fácil — desenvolvido por Alex Projeto
 </footer>
+
+<script>
+const SUPABASE_URL =
+  "https://ydqaqqwoxgbrkfysmldp.supabase.co";
+
+const SUPABASE_KEY =
+  "sb_publishable_QDmdirCdImZX_7iyEcd98w_iHleOBDK";
+
+const supabase = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
+const form = document.getElementById("formLogin");
+const mensagem = document.getElementById("mensagem");
+
+async function carregarPainel(user) {
+  mensagem.textContent = "Carregando seus dados...";
+
+  const { data, error } = await supabase
+    .from("memberships")
+    .select("condominium_id, role, unit_id")
+    .eq("user_id", user.id);
+
+  if (error) {
+    mensagem.textContent =
+      "Login realizado, mas houve erro ao carregar o perfil: " +
+      error.message;
+    return;
+  }
+
+  document.getElementById("login").hidden = true;
+  document.getElementById("painel").hidden = false;
+  document.getElementById("usuario").textContent =
+    "Usuário: " + user.email;
+
+  if (data && data.length > 0) {
+    document.getElementById("perfil").textContent =
+      "Perfil: " + data[0].role;
+    document.getElementById("condominio").textContent =
+      "Condomínio: " + data[0].condominium_id;
+  } else {
+    document.getElementById("perfil").textContent =
+      "Ainda não existe vínculo com um condomínio.";
+    document.getElementById("condominio").textContent = "";
+  }
+
+  mensagem.textContent = "";
+}
+
+form.addEventListener("submit", async function(event) {
+  event.preventDefault();
+  mensagem.textContent = "Verificando acesso...";
+
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("senha").value;
+
+  const { data, error } = await supabase.auth
+    .signInWithPassword({ email, password });
+
+  if (error) {
+    mensagem.textContent =
+      "Não foi possível entrar: " + error.message;
+    return;
+  }
+
+  await carregarPainel(data.user);
+});
+
+document.getElementById("sair").addEventListener(
+  "click", async function() {
+    await supabase.auth.signOut();
+    document.getElementById("painel").hidden = true;
+    document.getElementById("login").hidden = false;
+    form.reset();
+    mensagem.textContent = "Você saiu da plataforma.";
+  }
+);
+
+async function verificarSessao() {
+  const { data } = await supabase.auth.getSession();
+  if (data.session) {
+    await carregarPainel(data.session.user);
+  }
+}
+
+verificarSessao();
+</script>
 </body>
 </html>
